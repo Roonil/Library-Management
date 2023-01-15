@@ -1,9 +1,8 @@
 package library;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.NoSuchElementException;
 
 import javax.naming.NameNotFoundException;
@@ -38,7 +37,7 @@ public class Library {
         sections.get(idx).addBook(book, returnBook);
     }
 
-    void removeBook(int userID, int bookID, String bookTitle, boolean checkOut, Date dateTo)
+    void removeBook(int userID, int bookID, String bookTitle, boolean checkOut, String dateTo)
             throws NoSuchElementException {
         char startAlphabet = Character.toLowerCase(bookTitle.charAt(0));
         int idx = (startAlphabet - 97 + 1) * numSections / 26;
@@ -46,7 +45,7 @@ public class Library {
             sections.get(idx).removeBook(bookID, bookTitle, checkOut);
             if (checkOut)
                 users.get(userID - 1).libraryCard.rentBook(bookID, bookTitle,
-                        Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()), dateTo);
+                        DateTimeFormatter.ofPattern("dd-MM-yyyy").format(LocalDate.now()), dateTo);
 
         } catch (NoSuchElementException e) {
             System.out.println(e.getMessage());
@@ -56,6 +55,10 @@ public class Library {
 
     void addBorrower(String name, String address) {
         users.add(new Borrower(name, address, users.size() + 1));
+    }
+
+    void addBorrower(String name, String address, int userID, LibraryCard libraryCard) {
+        users.add(new Borrower(name, address, userID, libraryCard));
     }
 
     void removeBorrower(String name, int userID) throws NoSuchElementException {

@@ -1,26 +1,39 @@
 package library;
 
-import java.util.Date;
 import java.util.NoSuchElementException;
 
 class LibraryCardRecord {
-    final Date dateFrom, dateTo;
-    final int bookId;
+    final String dateFrom, dateTo;
+    final int bookID, libraryCardID;
     final String bookTitle;
-    Date returnDate;
+    String returnDate;
     boolean hasReturned = false;
 
-    LibraryCardRecord(Date dateFrom, Date dateTo, int bookId, String bookTitle) {
+    LibraryCardRecord(String dateFrom, String dateTo, int bookID, int libraryCardID, String bookTitle) {
         this.dateFrom = dateFrom;
         this.dateTo = dateTo;
-        this.bookId = bookId;
+        this.bookID = bookID;
+        this.libraryCardID = libraryCardID;
         this.bookTitle = bookTitle;
+
     }
 
-    void returnBook(int bookId, String bookTitle, Date returnDate) throws NoSuchElementException {
-        if (this.bookId == bookId && this.bookTitle == bookTitle) {
+    LibraryCardRecord(String dateFrom, String dateTo, int bookID, int libraryCardID, String bookTitle,
+            boolean hasReturned, String returnDate) {
+        this.dateFrom = dateFrom;
+        this.dateTo = dateTo;
+        this.bookID = bookID;
+        this.libraryCardID = libraryCardID;
+        this.bookTitle = bookTitle;
+        this.hasReturned = hasReturned;
+        this.returnDate = returnDate;
+    }
+
+    LibraryCardRecord returnBook(int bookID, String bookTitle, String returnDate) throws NoSuchElementException {
+        if (this.bookID == bookID && this.bookTitle.equals(bookTitle)) {
             hasReturned = true;
             this.returnDate = returnDate;
+            return this;
         } else
             throw new NoSuchElementException("The specified book does not exist in these Records!");
     }

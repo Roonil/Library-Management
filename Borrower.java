@@ -1,8 +1,7 @@
 package library;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.Date;
+import java.time.format.DateTimeFormatter;
 import java.util.NoSuchElementException;
 
 public class Borrower {
@@ -14,15 +13,21 @@ public class Borrower {
         this.name = name;
         this.address = address;
         this.userID = userID;
-        this.libraryCard = new LibraryCard(userID,
-                Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        this.libraryCard = new LibraryCard(userID, DateTimeFormatter.ofPattern("dd-MM-yyyy").format(LocalDate.now()));
     }
 
-    void returnBook(int bookId, String bookTitle, Date returnDate) throws NoSuchElementException {
-        libraryCard.returnBook(bookId, bookTitle, returnDate);
+    Borrower(String name, String address, int userID, LibraryCard libraryCard) {
+        this.name = name;
+        this.address = address;
+        this.userID = userID;
+        this.libraryCard = libraryCard;
     }
 
-    void rentBook(int bookId, String bookTitle, Date dateFrom, Date dateTo) {
+    LibraryCardRecord returnBook(int bookId, String bookTitle, String returnDate) throws NoSuchElementException {
+        return libraryCard.returnBook(bookId, bookTitle, returnDate);
+    }
+
+    void rentBook(int bookId, String bookTitle, String dateFrom, String dateTo) {
         libraryCard.rentBook(bookId, bookTitle, dateFrom, dateTo);
     }
 
@@ -31,7 +36,7 @@ public class Borrower {
                 + libraryCard.issueDate);
 
         for (LibraryCardRecord record : libraryCard.records) {
-            System.out.println(record.bookId + " " + record.bookTitle + " " + record.dateFrom + " " + record.dateTo
+            System.out.println(record.bookID + " " + record.bookTitle + " " + record.dateFrom + " " + record.dateTo
                     + " " + record.hasReturned + " " + record.returnDate);
         }
     }

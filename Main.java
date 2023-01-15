@@ -1,10 +1,11 @@
 package library;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.Date;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.NoSuchElementException;
 import java.sql.*;
+
 import javax.naming.NameNotFoundException;
 import javax.naming.SizeLimitExceededException;
 
@@ -59,11 +60,41 @@ public class Main {
         }
     }
 
+    static void tableAddRecord(final int userID, final LibraryCardRecord libraryCardRecord, final boolean returnBook) {
+        try {
+            Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            if (!tableExists(conn, "LibraryCardRecords")) {
+                String query = "CREATE TABLE LibraryCardRecords(libraryCardID INTEGER NOT NULL, bookID INTEGER NOT NULL, bookTitle varchar(255) NOT NULL, dateFrom varchar(255) NOT NULL,dateTo varchar(255) NOT NULL, returnDate varchar(255) , hasReturned BIT NOT NULL)";
+                Statement stmt = conn.createStatement();
+                stmt.executeUpdate(query);
+            }
+            if (!returnBook) {
+                String query = "INSERT INTO LibraryCardRecords VALUES(?,?,?,?,?,NULL,0)";
+                PreparedStatement preparedStatement = conn.prepareStatement(query);
+                preparedStatement.setInt(1, libraryCardRecord.libraryCardID);
+                preparedStatement.setInt(2, libraryCardRecord.bookID);
+                preparedStatement.setString(3, libraryCardRecord.bookTitle);
+                preparedStatement.setString(4, libraryCardRecord.dateFrom.toString());
+                preparedStatement.setString(5, libraryCardRecord.dateTo.toString());
+                preparedStatement.executeUpdate();
+            } else {
+                String query = "UPDATE LibraryCardRecords SET returnDate=?, hasReturned=1 where libraryCardID=? and bookID=? and hasReturned=0 limit 1";
+                PreparedStatement preparedStatement = conn.prepareStatement(query);
+                preparedStatement.setString(1, libraryCardRecord.returnDate.toString());
+                preparedStatement.setInt(2, libraryCardRecord.libraryCardID);
+                preparedStatement.setInt(3, libraryCardRecord.bookID);
+                preparedStatement.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     static void tableAddLibraryCard(LibraryCard libraryCard) {
         try {
             Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
             if (!tableExists(conn, "LibraryCards")) {
-                String query = "CREATE TABLE LibraryCards(userID INTEGER not NULL, libraryCardID INTEGER not NULL, issueDate VARCHAR(255) not NULL)";
+                String query = "CREATE TABLE LibraryCards(userID INTEGER not NULL UNIQUE, libraryCardID INTEGER PRIMARY KEY, issueDate VARCHAR(255) not NULL)";
                 Statement stmt = conn.createStatement();
                 stmt.executeUpdate(query);
             }
@@ -78,21 +109,22 @@ public class Main {
         }
     }
 
-    static void tableAddBorrower(Borrower borrower) {
+    static void tableAddBorrower(final Borrower borrower) {
         try {
-            Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            final Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
             if (!tableExists(conn, "Borrowers")) {
-                String query = "CREATE TABLE Borrowers(name varchar(255) not NULL, address varchar(255) not NULL, userID INTEGER not NULL, libraryCardID INTEGER not NULL)";
-                Statement stmt = conn.createStatement();
+                final String query = "CREATE TABLE Borrowers(name varchar(255) not NULL, address varchar(255) not NULL, userID INTEGER PRIMARY KEY, libraryCardID INTEGER not NULL)";
+                final Statement stmt = conn.createStatement();
                 stmt.executeUpdate(query);
             }
 
-            String query = "INSERT INTO Borrowers Values(?,?,?,?)";
-            PreparedStatement preparedStatement = conn.prepareStatement(query);
+            final String query = "INSERT INTO Borrowers Values(?,?,?,?)";
+            final PreparedStatement preparedStatement = conn.prepareStatement(query);
             preparedStatement.setString(1, borrower.name);
             preparedStatement.setString(2, borrower.address);
             preparedStatement.setInt(3, borrower.userID);
             preparedStatement.setInt(4, borrower.libraryCard.libraryCardID);
+            preparedStatement.executeUpdate();
             tableAddLibraryCard(borrower.libraryCard);
         } catch (SQLException e) {
             e.printStackTrace();
@@ -101,10 +133,15 @@ public class Main {
 
     static void tableAddBook(Book book, boolean returnBook) {
         try {
-            Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            final Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            if (!tableExists(conn, "Books")) {
+                String query = "Create Table Books(id INTEGER not NULL, title varchar(255) not NULL, author varchar(255) not NULL, contents varchar(255) not NULL, genre varchar(255) not NULL, price double(5,2) not NULL, isAvailable BIT not NULL )";
+                Statement stmt = conn.createStatement();
+                stmt.executeUpdate(query);
+            }
             if (tableExists(conn, "Books") && returnBook == false) {
-                String query = "INSERT INTO Books VALUES(?,?,?,?,?,?,?)";
-                PreparedStatement preparedStatement = conn.prepareStatement(query);
+                final String query = "INSERT INTO Books VALUES(?,?,?,?,?,?,?)";
+                final PreparedStatement preparedStatement = conn.prepareStatement(query);
                 preparedStatement.setInt(1, book.id);
                 preparedStatement.setString(2, book.title);
                 preparedStatement.setString(3, book.author);
@@ -114,11 +151,12 @@ public class Main {
                 preparedStatement.setBoolean(7, book.isAvailable);
                 preparedStatement.executeUpdate();
             } else if (tableExists(conn, "Books") && returnBook == true) {
-                String query = "UPDATE Books SET isAvailable=? where id=? and isAvailable=? limit 1";
-                PreparedStatement preparedStatement = conn.prepareStatement(query);
+                final String query = "UPDATE Books SET isAvailable=? where id=? and isAvailable=? limit 1";
+                final PreparedStatement preparedStatement = conn.prepareStatement(query);
                 preparedStatement.setBoolean(1, returnBook);
                 preparedStatement.setInt(2, book.id);
                 preparedStatement.setBoolean(3, !returnBook);
+                preparedStatement.executeUpdate();
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -138,6 +176,65 @@ public class Main {
         return resultSet.getInt(1) != 0;
     }
 
+    public static ArrayList<LibraryCardRecord> tableGetRecords(int libraryCardID) throws SQLException {
+        Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        if (tableExists(conn, "LibraryCards")) {
+            String query = "Select * from LibraryCardRecords where libraryCardID=?";
+            PreparedStatement preparedStatement = conn.prepareStatement(query);
+            preparedStatement.setInt(1, libraryCardID);
+            ResultSet rs = preparedStatement.executeQuery();
+            ArrayList<LibraryCardRecord> records = new ArrayList<LibraryCardRecord>();
+            while (rs.next()) {
+                records.add(new LibraryCardRecord(rs.getString("dateFrom"), rs.getString("dateTo"), rs.getInt("bookID"),
+                        libraryCardID, rs.getString("bookTitle"), rs.getBoolean("hasReturned"),
+                        rs.getString("returnDate")));
+            }
+            return records;
+        }
+        return null;
+
+    }
+
+    public static LibraryCard tableGetLibraryCard(int libraryCardID) throws SQLException {
+        Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        if (tableExists(conn, "LibraryCards")) {
+            String query = "Select * from LibraryCards where libraryCardID=?";
+            PreparedStatement preparedStatement = conn.prepareStatement(query);
+            preparedStatement.setInt(1, libraryCardID);
+            ResultSet rs = preparedStatement.executeQuery();
+            ArrayList<LibraryCardRecord> records = tableGetRecords(libraryCardID);
+            System.out.println("SIKE");
+            System.out.println(records.get(0).hasReturned);
+            while (rs.next()) {
+
+                LibraryCard libraryCard = new LibraryCard(rs.getInt("userID"), rs.getInt("libraryCardID"),
+                        DateTimeFormatter.ofPattern("dd-MM-yyyy").format(LocalDate.now()));
+                libraryCard.records.addAll(records);
+                return libraryCard;
+            }
+
+        }
+        return null;
+
+    }
+
+    public static void tableGetBorrowers() throws SQLException {
+        Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        if (tableExists(conn, "Borrowers")) {
+            String query = "Select * from Borrowers";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+            while (rs.next()) {
+                LibraryCard libraryCard = tableGetLibraryCard(rs.getInt("libraryCardID"));
+                library.addBorrower(rs.getString("name"), rs.getString("address"), rs.getInt("userID"),
+                        libraryCard);
+                System.out.println("SIKEEEE");
+                System.out.println(library.users.get(0).libraryCard.records.get(0).bookID);
+
+            }
+        }
+    }
+
     public static void initialiseLibrary() throws SQLException, SizeLimitExceededException, NameNotFoundException {
         Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
         if (tableExists(conn, "Library")) {
@@ -149,6 +246,8 @@ public class Main {
             }
 
             tableGetBooks();
+            tableGetBorrowers();
+
         }
     }
 
@@ -157,17 +256,14 @@ public class Main {
         library = new Library(numSections, shelfBookCapacity, penalty);
 
         Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        Statement stmt = conn.createStatement();
         if (!tableExists(conn, "Library")) {
-            Statement stmt = conn.createStatement();
-            String sql = "CREATE TABLE Library (numSections INTEGER not NULL, shelfBookCapacity INTEGER not NULL, penalty double(5,2) not NULL)";
-            stmt.executeUpdate(sql);
-            sql = "INSERT INTO Library Values(" + numSections + " , " + shelfBookCapacity + " , " + penalty + ")";
-            stmt.executeUpdate(sql);
-            sql = "Create Table Books(id INTEGER not NULL, title varchar(255) not NULL, author varchar(255) not NULL, contents varchar(255) not NULL, genre varchar(255) not NULL, price double(5,2) not NULL, isAvailable BIT not NULL )";
-            stmt.executeUpdate(sql);
-        } else {
-
+            String query = "CREATE TABLE Library (numSections INTEGER not NULL, shelfBookCapacity INTEGER not NULL, penalty double(5,2) not NULL)";
+            stmt.executeUpdate(query);
         }
+        String query = "INSERT INTO Library Values(" + numSections + " , " + shelfBookCapacity + " , " + penalty + ")";
+        stmt.executeUpdate(query);
+
     }
 
     public static void displayCard(int userID) {
@@ -198,14 +294,17 @@ public class Main {
 
     public static void returnBook(Book book, int userID) {
         try {
-            library.addBook(book, true);
+
             for (Borrower borrower : library.users) {
                 if (borrower.userID == userID) {
-                    borrower.returnBook(book.id, book.title,
-                            Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    LibraryCardRecord rec = borrower.returnBook(book.id, book.title,
+                            DateTimeFormatter.ofPattern("dd-MM-yyyy").format(LocalDate.now()));
+                    library.addBook(book, true);
+                    tableAddBook(book, true);
+                    tableAddRecord(userID, rec, true);
                 }
             }
-            tableAddBook(book, true);
+
         } catch (NameNotFoundException e) {
             System.out.println(e.getMessage());
         } catch (SizeLimitExceededException e) {
@@ -223,11 +322,14 @@ public class Main {
         }
     }
 
-    public static void checkOut(int userID, int bookID, String bookTitle, Date dateTo) {
+    public static void checkOut(int userID, int bookID, String bookTitle, String dateTo) {
         try {
             library.removeBook(userID, bookID,
                     bookTitle, true, dateTo);
             tableRemoveBook(bookID, true);
+            tableAddRecord(userID, library.users.get(userID - 1).libraryCard.records
+                    .get(library.users.get(userID - 1).libraryCard.records.size() - 1),
+                    false);
         } catch (NoSuchElementException e) {
             System.out.println(e.getMessage());
         }
@@ -235,19 +337,21 @@ public class Main {
 
     public static void main(String[] args) throws SQLException, SizeLimitExceededException, NameNotFoundException {
         initialiseLibrary();
+        // library.getDetails();
         // initialiseLibrary(2, 4, 0.0);
         // addBook(new Book(
         // "Harry Potter And The Half-Blood Prince", "J.K. Rowling", "Fiction", "Chapter
         // 1", 1001, 100));
-        addBorrower("Anand Verma", "4 Privet Drive");
+        // addBorrower("Anand Verma", "4 Privet Drive");
 
         // checkOut(1, 1001, "Harry Potter And The Half-Blood Prince",
-        // Date.from(LocalDate.of(2023, 10,
-        // 01).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        // DateTimeFormatter.ofPattern("dd-MM-yyyy").format(LocalDate.of(2023, 10,
+        // 01)));
+        displayCard(1);
         // returnBook(new Book(
         // "Harry Potter And The Half-Blood Prince", "J.K. Rowling", "Fiction", "Chapter
         // 1", 1001, 100), 1);
-        displayCard(1);
+
         // returnBook(new Book(
         // "Harry Potter And The Half-Blood Prince", "J.K. Rowling", "Fiction", "Chapter
         // 1", 1001, 100.00), 1);
